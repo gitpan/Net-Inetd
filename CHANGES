@@ -1,10 +1,10 @@
 Revision history for Perl extension Net::Inetd.
 
 0.11 2004/01/28
- - deadlock in flock() abandoned.
+ - Deadlock in flock() abandoned.
 
 0.09 2004/01/27
- - some inefficiency cleaned up.
+ - Some inefficiency cleaned up.
 
 0.07 2004/01/25
  - inetd.conf is locked.
@@ -13,7 +13,7 @@ Revision history for Perl extension Net::Inetd.
  - bin/inetd.pl added.
 
 0.02 2004/01/20
- - methods for dumping enabled/disabled services.
+ - Methods for dumping enabled/disabled services.
 
 0.01 2004/01/19
- - initial version.
+ - Initial version.

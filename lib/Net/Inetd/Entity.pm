@@ -13,23 +13,27 @@ sub croak {
 }
 
 sub _new {
-    my $conf_file = shift || $INETD_CONF;      
+    my $conf_file = shift || $INETD_CONF;   
+       
     my %data;    
     _tie_conf(\@{$data{CONF}}, $conf_file);    
-    %{$data{ENABLED}} = %{_parse_enabled(@{$data{CONF}})};    
+    %{$data{ENABLED}} = %{_parse_enabled(@{$data{CONF}})}; 
+       
     return \%data;
 } 
 
 sub _tie_conf {
     my($conf, $file) = @_;
+    
     $conf_tied = tie @$conf, 'Tie::File', $file, mode => O_RDWR
       or croak "Couldn't tie $file: $!";
     $conf_tied->flock(LOCK_EX);
 }   
 
-sub _parse_enabled {
-    my %is_enabled;         
+sub _parse_enabled {         
     _filter_conf(\@_);
+    
+    my %is_enabled;
     for my $entry (@_) {
 	my($serv, $prot) = _split_serv_prot($entry);
 	$is_enabled{$serv}{$prot} = !/^\#/ ? 1 : 0;
@@ -53,11 +57,12 @@ sub _set {
     croak "usage: \$Inetd->$called(\$service => \$protocol)"
       unless $serv && $prot;
     
-    local $_;
     my $enable = 1 if $called eq 'enable';
     my $prechar = $enable ? '#' : '';
+    
+    local $_;
     for (@{$o->{CONF}}) {
-        if (/^$prechar$serv.*$prot\b/) {
+        if (/^$prechar $serv.*$prot\b/ox) {
 	    $o->{ENABLED}{$serv}{$prot} = $enable ? 1 : 0;
 	    $_ = $enable ? substr($_, 1, length) : '#'.$_;
 	    return 1;
@@ -67,7 +72,7 @@ sub _set {
 }
 
 sub _dump {
-    my $o = shift;
+    my($o) = @_;
     my $called = _getcaller('.*_(.*)');
     croak "usage: \$Inetd->dump_$called"
       unless ref $o;
@@ -75,11 +80,13 @@ sub _dump {
     my @conf = @{$o->{CONF}};
     _filter_conf(\@conf, $called eq 'enabled' 
       ? '^[^#]' : '^#');
+      
     return \@conf;     
 }
 
 sub _filter_conf {
-    my($conf, @regexps) = @_; 
+    my($conf, @regexps) = @_;
+     
     unshift @regexps, '(?:stream|dgram|raw|rdm|seqpacket)';
     for (my $i = $#$conf; $i >= 0; $i--) {
         for my $regexp (@regexps) {
@@ -90,22 +97,27 @@ sub _filter_conf {
 }
 
 sub _split_serv_prot {
-    my($entry) = shift; 
+    my($entry) = @_;
+     
     my($serv, $prot) = (split $entry)[0,2];
     $serv =~ s/.*:(.*)/$1/; 
     $serv = substr($serv, 1, length $serv) 
-      if $serv =~ /^\#/; 
+      if $serv =~ /^\#/;  
+          
     return($serv, $prot);
 }
 
 sub _getcaller {
     my $regexp = shift || '(.*)';
-    my ($called) = (caller(2))[3] =~ /.*:$regexp/;
+    
+    my($called) = (caller(2))[3] =~ /.*:$regexp/;   
+     
     return $called;
 }
 
 sub _destroy { 
-    my $o = shift;
+    my($o) = @_;
+    
     $conf_tied->flock(LOCK_UN);
     untie @{$o->{CONF}};
 } 

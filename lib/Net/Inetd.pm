@@ -1,14 +1,13 @@
 package Net::Inetd;
 
-$VERSION = '0.14';
+$VERSION = '0.15';
 
 use strict;
 use Net::Inetd::Entity;
 
 sub new {
-    my($self, $conf) = @_;  
-    my $class = ref $self || $self;
-    return bless Net::Inetd::Entity::_new($conf), $class;
+    my($self, $conf) = @_;      
+    return bless Net::Inetd::Entity::_new($conf), ref $self || $self;
 }
 
 sub is_enabled    { &Net::Inetd::Entity::_is_enabled }
