@@ -1,7 +1,7 @@
 package Net::Inetd::Entity;
 
 use strict;
-use vars qw($INETD_CONF $tied);
+use vars qw($INETD_CONF $conf_tied);
 use Fcntl qw(O_RDWR LOCK_EX LOCK_UN);
 use Tie::File;
 
@@ -22,16 +22,16 @@ sub _new {
 
 sub _tie_conf {
     my($conf, $file) = @_;
-    $tied = tie @$conf, 'Tie::File', $file, mode => O_RDWR
+    $conf_tied = tie @$conf, 'Tie::File', $file, mode => O_RDWR
       or croak "Couldn't tie $file: $!";
-    $tied->flock(LOCK_EX);
+    $conf_tied->flock(LOCK_EX);
 }   
 
 sub _parse_enabled {
     my %is_enabled;         
     _filter_conf(\@_);
-    for my $line (@_) {
-	my($serv, $prot) = _split_serv_prot($line);
+    for my $entry (@_) {
+	my($serv, $prot) = _split_serv_prot($entry);
 	$is_enabled{$serv}{$prot} = !/^\#/ ? 1 : 0;
     }    
     return \%is_enabled;
@@ -84,14 +84,14 @@ sub _filter_conf {
     for (my $i = $#$conf; $i >= 0; $i--) {
         for my $regexp (@regexps) {
 	    splice(@$conf, $i, 1) && last
-	      unless $conf->[$i] =~ /$regexp/;
+	      unless ($conf->[$i] =~ /$regexp/);
 	}
     }   
 }
 
 sub _split_serv_prot {
-    my($line) = shift; 
-    my($serv, $prot) = (split $line)[0,2];
+    my($entry) = shift; 
+    my($serv, $prot) = (split $entry)[0,2];
     $serv =~ s/.*:(.*)/$1/; 
     $serv = substr($serv, 1, length $serv) 
       if $serv =~ /^\#/; 
@@ -106,7 +106,7 @@ sub _getcaller {
 
 sub _destroy { 
     my $o = shift;
-    $tied->flock(LOCK_UN);
+    $conf_tied->flock(LOCK_UN);
     untie @{$o->{CONF}};
 } 
 
