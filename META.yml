@@ -1,0 +1,10 @@
+--- #YAML:1.0
+module_name: Net-Inetd
+dist_version_from: lib/Net/Inetd.pm
+installdirs: site
+requires:
+    Tie::File: 0 
+distribution_type: module
+license: perl
+dist_abstract: an interface to inetd.conf.
+dist_author: Steven Schubiger
