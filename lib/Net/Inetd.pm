@@ -1,14 +1,14 @@
 package Net::Inetd;
 
-$VERSION = '0.16';
+$VERSION = '0.17';
 
 use strict;
 use Net::Inetd::Entity;
 
 sub new {
-    my($self, $conf) = @_;  
+    my ($self, $conf) = @_;  
     my $class = ref $self || $self;    
-    return bless Net::Inetd::Entity::_new($conf), $class;
+    return bless( Net::Inetd::Entity::_new( $conf ), $class );
 }
 
 sub is_enabled    { &Net::Inetd::Entity::_is_enabled }
@@ -32,8 +32,8 @@ Net::Inetd - An interface to inetd.conf
 
  $Inetd = Net::Inetd->new;                      
 
- if ($Inetd->is_enabled(telnet => 'tcp')) {    
-     $Inetd->disable(telnet => 'tcp');
+ if ($Inetd->is_enabled( telnet => 'tcp' )) {    
+     $Inetd->disable( telnet => 'tcp' );
  }
 
  print $Inetd->{CONF}[6];                                               
@@ -53,7 +53,7 @@ and dumping them by their state.
 
 Object constructor.
 
- $Inetd = Net::Inetd->new('./inetd.conf');
+ $Inetd = Net::Inetd->new( './inetd.conf' );
 
 Omitting the path to inetd.conf, will cause the default
 F</etc/inetd.conf> to be used.
@@ -62,7 +62,7 @@ F</etc/inetd.conf> to be used.
 
 Checks whether a service is enlisted as enabled.
 
- $Inetd->is_enabled($service => $protocol);
+ $Inetd->is_enabled( $service => $protocol );
 
 Returns 1 if the service is enlisted as enabled, 0 if 
 enlisted as disabled, undef if the service does not exist. 
@@ -71,19 +71,25 @@ enlisted as disabled, undef if the service does not exist.
 
 Enables a service.
 
- $Inetd->enable($service => $protocol);
+ $Inetd->enable( $service => $protocol );
 
 Returns 1 if the service has been enabled, 
 0 if no action has been taken.
 
+It is recommended to preceedingly run is_enabled() 
+to determine whether a service is disabled.
+
 =head2 disable
 
-Disables a service.
+Disables a service. 
 
- $Inetd->disable($service => $protocol);
+ $Inetd->disable( $service => $protocol );
 
 Returns 1 if the service has been disabled, 
-0 if no action has been taken.
+0 if no action has been taken. 
+
+It is recommended to preceedingly run is_enabled() 
+to determine whether a service is enabled.
 
 =head2 dump_enabled
 
