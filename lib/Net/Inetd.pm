@@ -1,4 +1,4 @@
-# $Id: Inetd.pm,v 0.04 2004/01/20 12:14:09 sts Exp $
+# $Id: Inetd.pm,v 0.05 2004/01/22 15:05:46 sts Exp $
 
 package Net::Inetd;
 
@@ -7,19 +7,12 @@ use base qw(Exporter);
 use strict;
 use warnings;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Tie::File;
 
-our $enable;
+our ($enable, $INETD_CONF);
 
-our ($CONF, 
-     $ENABLED, 
-     $INETD_CONF,
-);
-
-$CONF = 'CONF';
-$ENABLED = 'ENABLED';
 $INETD_CONF = '/etc/inetd.conf';
 
 sub croak { 
@@ -36,11 +29,11 @@ sub new {
 
 sub is_enabled {
     my ($o, $serv, $prot) = @_;
-    croak q~usage: $Inetd->is_enabled ($service => $protocol)~
+    croak q~Usage: $Inetd->is_enabled($service => $protocol)~
       unless $serv && $prot;
     
-    return defined $o->{$ENABLED}{$serv}{$prot}
-      ? $o->{$ENABLED}{$serv}{$prot}
+    return defined $o->{ENABLED}{$serv}{$prot}
+      ? $o->{ENABLED}{$serv}{$prot}
       : undef;
 }
 
@@ -56,8 +49,8 @@ sub _class_data {
     $conf_file ||= $INETD_CONF;
     
     my %data;    
-    _tie_conf(\@{$data{$CONF}}, \$conf_file);    
-    %{$data{$ENABLED}} = %{_parse_enabled(@{$data{$CONF}})};
+    _tie_conf(\@{$data{CONF}}, \$conf_file);    
+    %{$data{ENABLED}} = %{_parse_enabled(@{$data{CONF}})};
     
     return \%data;
 } 
@@ -66,7 +59,7 @@ sub _tie_conf {
     my ($conf, $file) = @_;
     
     tie @$conf, 'Tie::File', $$file
-      or croak qq~couldn't tie $$file: $!~;
+      or croak qq~Couldn't tie $$file: $!~;
 }   
 
 sub _parse_enabled {
@@ -76,8 +69,7 @@ sub _parse_enabled {
 	_split_serv(\@serv, \$_);	
 	my ($serv, $prot) = (shift @serv, splice @serv, 1, 1);
 	
-	if (!/^\#/) { $is_enabled{$serv}{$prot} = 1 }
-	else { $is_enabled{$serv}{$prot} = 0 }
+	$is_enabled{$serv}{$prot} = !/^\#/ ? 1 : 0;
     }
     
     return \%is_enabled;
@@ -86,23 +78,23 @@ sub _parse_enabled {
 sub _set {
     my ($o, $serv, $prot) = @_;
     my $sub = $enable ? 'enable' : 'disable';
-    croak qq~usage: \$Inetd->$sub (\$service => \$protocol)~
+    croak qq~Usage: \$Inetd->$sub(\$service => \$protocol)~
       unless $serv && $prot;
     
     my $ret_state = 0;
-    for (my $i = 0; $i < @{$o->{$CONF}}; $i++) {
-        if ($o->{$CONF}[$i] =~ /$serv.*$prot\b/) {
+    for (my $i = 0; $i < @{$o->{CONF}}; $i++) {
+        if ($o->{CONF}[$i] =~ /$serv.*$prot\b/) {
 	    if ($enable) {
-	        if ($o->{$CONF}[$i] =~ /^\#/) {
-	            $o->{$CONF}[$i] = substr $o->{$CONF}[$i], 
-		      1, length $o->{$CONF}[$i];
-		    $o->{$ENABLED}{$serv}{$prot} = 1;
+	        if ($o->{CONF}[$i] =~ /^\#/) {
+	            $o->{CONF}[$i] = substr $o->{CONF}[$i], 
+		      1, length $o->{CONF}[$i];
+		    $o->{ENABLED}{$serv}{$prot} = 1;
 		    $ret_state = 1;
 		}
             } 
-	    elsif ($o->{$CONF}[$i] !~ /^\#/) {
-	        $o->{$CONF}[$i] = '#'.$o->{$CONF}[$i];
-		$o->{$ENABLED}{$serv}{$prot} = 0;
+	    elsif ($o->{CONF}[$i] !~ /^\#/) {
+	        $o->{CONF}[$i] = '#'.$o->{CONF}[$i];
+		$o->{ENABLED}{$serv}{$prot} = 0;
 		$ret_state = 1;
 	    }      
 	}    
@@ -115,7 +107,7 @@ sub _dump {
     my $o = $_[0];
     
     my @dump;
-    my @conf = @{$o->{$CONF}}; _filter_conf(\@conf);  
+    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);  
     for (@conf) {
         next if (($enable && $_ =~ /^\#/) 
 	  || (!$enable && $_ !~ /^\#/));
@@ -133,7 +125,7 @@ sub _filter_conf {
         push @tmp, $_
 	  if /(?:stream|dgram|raw|rdm|seqpacket)/;
     }
-    @$conf = @tmp; 
+    @$conf = @tmp;
 }
 
 sub _split_serv {
@@ -142,7 +134,7 @@ sub _split_serv {
     @$serv = split /\s.*?/, $$line;
     splice @$serv, 1, 1 if $$serv[1] !~ /\w/;
     
-    ($$serv[0]) = $$serv[0] =~ /.*:(.*)/ 
+    ($$serv[0]) = $$serv[0] =~ /.*:(?:.*)/ 
       if $$serv[0] =~ /:/;
     $$serv[0] = substr $$serv[0], 1, length $$serv[0] 
       if $$serv[0]=~ /^\#/; 
@@ -161,12 +153,12 @@ Net::Inetd - an interface to inetd.conf.
 
  $Inetd = Net::Inetd->new;                      # constructor
 
- if ($Inetd->is_enabled (telnet => 'tcp')) {    # disable telnet
-     $Inetd->disable (telnet => 'tcp');
+ if ($Inetd->is_enabled(telnet => 'tcp')) {     # disable telnet
+     $Inetd->disable(telnet => 'tcp');
  }
 
- if (!$Inetd->is_enabled (ftp => 'tcp')) {      # enable ftp
-     $Inetd->enable (ftp => 'tcp');
+ if (!$Inetd->is_enabled(ftp => 'tcp')) {       # enable ftp
+     $Inetd->enable(ftp => 'tcp');
  }
 
  print $Inetd->{CONF}[6];                       # output a line
@@ -174,32 +166,32 @@ Net::Inetd - an interface to inetd.conf.
  push @{$Inetd->{CONF}}, $service;              # add a new line
 
  pop @{$Inetd->{CONF}};                         # NOT recommended.
- 
+
  $, = "\n";
  print @{$Inetd->dump_enabled},"\n";            # output enabled services
 
 =head1 DESCRIPTION
 
 C<Net::Inetd> is an interface to inetd's configuration file inetd.conf;
-it allows checking and setting the enabled / disabled state of a service 
-and dumping services sorted by their state.
+it simplifies checking and setting the enabled / disabled state of services 
+and dumping them by their state.
 
-=head1 CONSTRUCTOR
+=head1 METHODS
 
 =head2 new
 
- $Inetd = Net::Inetd->new ('./inetd.conf');
+Object constructor.
+
+ $Inetd = Net::Inetd->new('./inetd.conf');
 
 Omitting the path to inetd.conf, will cause the default
 F</etc/inetd.conf> to be used.
-
-=head1 METHODS
 
 =head2 is_enabled
 
 Checks whether a service is enlisted as enabled.
 
- $Inetd->is_enabled ($service => $protocol);
+ $Inetd->is_enabled($service => $protocol);
 
 Returns 1 if the service is enlisted as enabled, 0 if 
 enlisted as disabled, undef if the service does not exist. 
@@ -208,7 +200,7 @@ enlisted as disabled, undef if the service does not exist.
 
 Enables a service.
 
- $Inetd->enable ($service => $protocol);
+ $Inetd->enable($service => $protocol);
 
 Returns 1 if the service has been enabled, 
 0 if no action has been taken.
@@ -217,7 +209,7 @@ Returns 1 if the service has been enabled,
 
 Disables a service.
 
- $Inetd->disable ($service => $protocol);
+ $Inetd->disable($service => $protocol);
 
 Returns 1 if the service has been disabled, 
 0 if no action has been taken.
@@ -240,9 +232,9 @@ Dumps the disabled services.
 Returns an arrayref that consists of inetd.conf
 lines which contain disabled services.
 
-=head1 CLASS DATA
+=head1 INSTANCE DATA
 
-The inetd.conf configuration is tied as class data using C<Tie::File>.
+The inetd.conf configuration is tied as instance data using C<Tie::File>.
 
 It may be accessed by @{$Inetd->{CONF}}.
 
