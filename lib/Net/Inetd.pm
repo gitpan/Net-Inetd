@@ -1,4 +1,4 @@
-# $Id: Inetd.pm,v 0.03 2004/01/20 12:14:09 sts Exp $
+# $Id: Inetd.pm,v 0.04 2004/01/20 12:14:09 sts Exp $
 
 package Net::Inetd;
 
@@ -7,7 +7,7 @@ use base qw(Exporter);
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Tie::File;
 
@@ -72,9 +72,9 @@ sub _tie_conf {
 sub _parse_enabled {
     my (%is_enabled, @serv);     
     _filter_conf(\@_);
-    foreach (@_) {
+    for (@_) {
 	_split_serv(\@serv, \$_);	
-	my ($serv, $prot) = (shift @serv, splice @serv,1,1);
+	my ($serv, $prot) = (shift @serv, splice @serv, 1, 1);
 	
 	if (!/^\#/) { $is_enabled{$serv}{$prot} = 1 }
 	else { $is_enabled{$serv}{$prot} = 0 }
@@ -116,7 +116,7 @@ sub _dump {
     
     my @dump;
     my @conf = @{$o->{$CONF}}; _filter_conf(\@conf);  
-    foreach (@conf) {
+    for (@conf) {
         next if (($enable && $_ =~ /^\#/) 
 	  || (!$enable && $_ !~ /^\#/));
 	push @dump, $_;    
@@ -129,7 +129,7 @@ sub _filter_conf {
     my $conf = $_[0];
     
     my @tmp;
-    foreach (@$conf) {
+    for (@$conf) {
         push @tmp, $_
 	  if /(?:stream|dgram|raw|rdm|seqpacket)/;
     }
@@ -140,7 +140,7 @@ sub _split_serv {
     my ($serv, $line) = @_;
     
     @$serv = split /\s.*?/, $$line;
-    splice @$serv,1,1 if $$serv[1] !~ /\w/;
+    splice @$serv, 1, 1 if $$serv[1] !~ /\w/;
     
     ($$serv[0]) = $$serv[0] =~ /.*:(.*)/ 
       if $$serv[0] =~ /:/;
