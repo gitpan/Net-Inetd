@@ -1,7 +1,7 @@
 Net::Inetd
 ==========
 
-An interface to inetd.conf.
+An interface to inetd.conf
 
 INSTALLATION
 
@@ -16,7 +16,7 @@ SCRIPTS
 
 bin/inetd.pl
 
-Interface to Net::Inetd that outputs services.
+Outputs services as in /etc/inetd.conf.
 
 LICENSE
 

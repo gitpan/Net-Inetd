@@ -7,4 +7,3 @@ requires:
 distribution_type: module
 license: perl
 dist_abstract: An interface to inetd.conf
-dist_author: Steven Schubiger

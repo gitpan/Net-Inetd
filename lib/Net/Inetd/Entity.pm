@@ -30,8 +30,8 @@ sub _tie_conf {
 sub _parse_enabled {
     my %is_enabled;         
     _filter_conf(\@_);
-    for (@_) {
-	my($serv, $prot) = _split_serv_prot($_);
+    for my $line (@_) {
+	my($serv, $prot) = _split_serv_prot($line);
 	$is_enabled{$serv}{$prot} = !/^\#/ ? 1 : 0;
     }    
     return \%is_enabled;
@@ -53,6 +53,7 @@ sub _set {
     croak "usage: \$Inetd->$called(\$service => \$protocol)"
       unless $serv && $prot;
     
+    local $_;
     my $enable = 1 if $called eq 'enable';
     my $prechar = $enable ? '#' : '';
     for (@{$o->{CONF}}) {
@@ -78,30 +79,28 @@ sub _dump {
 }
 
 sub _filter_conf {
-    my $conf = shift; 
-    my @patterns = ('(?:stream|dgram|raw|rdm|seqpacket)', @_);
-    my $match;
-    for my $i (-$#$conf..0) {
-        for (@patterns) {
-            $match = $conf->[-$i] =~ /$_/;
-	    splice(@$conf, -$i, 1) && last unless $match;
+    my($conf, @regexps) = @_; 
+    unshift @regexps, '(?:stream|dgram|raw|rdm|seqpacket)';
+    for (my $i = $#$conf; $i >= 0; $i--) {
+        for my $regexp (@regexps) {
+	    splice(@$conf, $i, 1) && last
+	      unless $conf->[$i] =~ /$regexp/;
 	}
     }   
 }
 
 sub _split_serv_prot {
     my($line) = shift; 
-    my($serv, $prot) = (split, $line)[0,2];
-    ($serv) = $serv =~ /.*:(.*)/ 
-      if $serv =~ /:/;
+    my($serv, $prot) = (split $line)[0,2];
+    $serv =~ s/.*:(.*)/$1/; 
     $serv = substr($serv, 1, length $serv) 
       if $serv =~ /^\#/; 
     return($serv, $prot);
 }
 
 sub _getcaller {
-    my $pattern = shift || '(.*)';
-    my ($called) = (caller(2))[3] =~ /.*:$pattern/;
+    my $regexp = shift || '(.*)';
+    my ($called) = (caller(2))[3] =~ /.*:$regexp/;
     return $called;
 }
 
