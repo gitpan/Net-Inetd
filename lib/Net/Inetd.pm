@@ -1,6 +1,6 @@
 package Net::Inetd;
 
-$VERSION = '0.18';
+$VERSION = '0.2';
 
 use strict;
 use Net::Inetd::Entity;
