@@ -6,5 +6,5 @@ requires:
     Tie::File: 0 
 distribution_type: module
 license: perl
-dist_abstract: an interface to inetd.conf.
+dist_abstract: An interface to inetd.conf
 dist_author: Steven Schubiger

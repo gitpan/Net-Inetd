@@ -1,129 +1,28 @@
 package Net::Inetd;
 
-use 5.006;
+$VERSION = '0.1';
+
 use strict;
-use warnings;
-
-our $VERSION = '0.09';
-
-use Carp 'croak';
-use Fcntl 'O_RDWR';
-use Tie::File;
-
-our $INETD_CONF = '/etc/inetd.conf';
+use Net::Inetd::Entity;
 
 sub new {
-    my($pkg, $conf) = @_;    
-    my $class = ref $pkg || $pkg;
-    return bless _data($conf), $class; 
+    my($pkg, $conf) = @_;
+    my $class = ref $pkg || $pkg;    
+    return bless Net::Inetd::Entity::_data($conf), $class; 
 }
 
-sub is_enabled {
-    my($o, $serv, $prot) = @_;
-    croak 'usage: $Inetd->is_enabled($service => $protocol)'
-      unless $serv && $prot;
-    
-    return defined $o->{ENABLED}{$serv}{$prot}
-      ? $o->{ENABLED}{$serv}{$prot}
-      : undef;
-}
-
-sub enable        { &_set  }
-sub disable       { &_set  }
-sub dump_enabled  { &_dump }
-sub dump_disabled { &_dump }
-
-sub _data {
-    my $conf_file = shift || $INETD_CONF;      
-    my %data;    
-    _tie_conf(\@{$data{CONF}}, $conf_file);    
-    %{$data{ENABLED}} = %{_parse_enabled(@{$data{CONF}})};    
-    return \%data;
-} 
-
-sub _tie_conf {
-    my($conf, $file) = @_;
-    my $tied = tie @$conf, 'Tie::File', $file, mode => O_RDWR
-      or croak "Couldn't tie $file: $!";
-    $tied->flock;
-}   
-
-sub _parse_enabled {
-    my %is_enabled;         
-    _filter_conf(\@_);
-    for (@_) {
-	my($serv, $prot) = _split_serv_prot($_);
-	$is_enabled{$serv}{$prot} = !/^\#/ ? 1 : 0;
-    }    
-    return \%is_enabled;
-} 
-
-sub _set {
-    my($o, $serv, $prot) = @_;
-    my $called = _getcaller();
-    croak "usage: \$Inetd->$called(\$service => \$protocol)"
-      unless $serv && $prot;
-    
-    my($prechar, $enable) = $called eq 'enable'
-      ? ('#', 1) : ('', 0);
-    for (@{$o->{CONF}}) {
-        if (/^$prechar$serv.*$prot\b/) {
-	    ($_, $o->{ENABLED}{$serv}{$prot}) = $enable
-	      ? (substr($_, 1, length), 1)
-	      : ('#'.$_, 0);
-	    return 1;
-	}
-    }
-    return 0;
-}
-
-sub _dump {
-    my $o = shift;
-    my $called = _getcaller('.*_(.*)');
-    croak "usage: \$Inetd->dump_$called"
-      unless ref $o;
-       
-    my @conf = @{$o->{CONF}};
-    _filter_conf(\@conf, $called eq 'enabled' 
-      ? '^[^#]' : '^#');
-    return \@conf;     
-}
-
-sub _filter_conf {
-    my $conf = shift;
-    my $match;   
-    my @patterns = ('(?:stream|dgram|raw|rdm|seqpacket)', @_);     
-    for (my $i = 0; $i < @$conf;) {
-        for (@patterns) { 
-            $match = $$conf[$i] =~ /$_/;
-	    last unless $match;
-	}
-	$match ? $i++ : splice @$conf, $i, 1;
-    } 
-}
-
-sub _split_serv_prot {
-    my($line) = shift; 
-    my($serv, $prot) = (split, $line)[0,2];
-    ($serv) = $serv =~ /.*:(.*)/ 
-      if $serv =~ /:/;
-    $serv = substr $serv, 1, length $serv 
-      if $serv =~ /^\#/; 
-    return($serv, $prot);
-}
-
-sub _getcaller {
-    my $pattern = shift || '(?:.*)';
-    my ($called) = (caller(2))[3] =~ /.*:$pattern/;
-    return $called;
-}
+sub is_enabled    { &Net::Inetd::Entity::_is_enabled }
+sub enable        { &Net::Inetd::Entity::_set }
+sub disable       { &Net::Inetd::Entity::_set }
+sub dump_enabled  { &Net::Inetd::Entity::_dump }
+sub dump_disabled { &Net::Inetd::Entity::_dump }
 
 1;
 __END__
 
 =head1 NAME
 
-Net::Inetd - an interface to inetd.conf.
+Net::Inetd - An interface to inetd.conf
 
 =head1 SYNOPSIS
 
@@ -204,13 +103,11 @@ lines which contain disabled services.
 
 =head1 INSTANCE DATA
 
-The inetd.conf configuration is tied as instance data
-by using Tie::File.
-
-It may be accessed by @{$Inetd->{CONF}}.
+The inetd.conf configuration is tied as instance data;
+it may be accessed by @{$Inetd->{CONF}}.
 
 =head1 SEE ALSO
 
-L<Tie::File>, inetd(8).
+L<Tie::File>, inetd(8)
 
 =cut
