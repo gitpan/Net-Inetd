@@ -21,7 +21,7 @@ sub _new {
     my $conf_file = shift || $INETD_CONF;   
        
     my %data;    
-    _tie_conf(\@{$data{CONF}}, $conf_file);    
+    _tie_conf( \@{$data{CONF}}, $conf_file );    
     %{$data{ENABLED}} = %{_parse_enabled( @{$data{CONF}} )}; 
        
     return \%data;
@@ -32,7 +32,8 @@ sub _tie_conf {
     
     $conf_tied = tie( @$conf, 'Tie::File', $file, mode => O_RDWR )
       or croak "Couldn't tie $file: $!";
-    $conf_tied->flock( LOCK_EX );
+    $conf_tied->flock( LOCK_EX )
+      or croak "Couldn't lock $file: $!";
 }   
 
 sub _parse_enabled {         

@@ -1,5 +1,5 @@
 bin/inetd.pl
-CHANGES
+Changes
 lib/Net/Inetd.pm
 lib/Net/Inetd/Entity.pm
 Makefile.PL

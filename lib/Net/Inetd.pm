@@ -1,13 +1,13 @@
 package Net::Inetd;
 
-$VERSION = '0.17';
+$VERSION = '0.18';
 
 use strict;
 use Net::Inetd::Entity;
 
 sub new {
     my ($self, $conf) = @_;  
-    my $class = ref $self || $self;    
+    my $class = ref( $self ) || $self;    
     return bless( Net::Inetd::Entity::_new( $conf ), $class );
 }
 
