@@ -79,13 +79,14 @@ sub _dump {
 
 sub _filter_conf {
     my $conf = shift; 
-    my @patterns = ('(?:stream|dgram|raw|rdm|seqpacket)', @_);     
-    for (my $match, my $i = 0; $i < @$conf; $i++ if $match) {
-        for (@patterns) { 
-            $match = $$conf[$i] =~ /$_/;
-	    splice(@$conf, $i, 1) && last unless $match;
+    my @patterns = ('(?:stream|dgram|raw|rdm|seqpacket)', @_);
+    my $match;
+    for my $i (-$#$conf..0) {
+        for (@patterns) {
+            $match = $conf->[-$i] =~ /$_/;
+	    splice(@$conf, -$i, 1) && last unless $match;
 	}
-    }
+    }   
 }
 
 sub _split_serv_prot {

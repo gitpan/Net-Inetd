@@ -1,6 +1,6 @@
 package Net::Inetd;
 
-$VERSION = '0.11';
+$VERSION = '0.12';
 
 use strict;
 use Net::Inetd::Entity;
@@ -17,7 +17,7 @@ sub disable       { &Net::Inetd::Entity::_set }
 sub dump_enabled  { &Net::Inetd::Entity::_dump }
 sub dump_disabled { &Net::Inetd::Entity::_dump }
 
-sub DESTROY { &Net::Inetd::Entity::_destroy }
+sub DESTROY       { &Net::Inetd::Entity::_destroy }
 
 1;
 __END__
