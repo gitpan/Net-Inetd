@@ -2,11 +2,10 @@
 
 use strict;
 use warnings;
-
 use Net::Inetd;
 
-my $Inetd = Net::Inetd->new('./inetd.conf');
+my $Inetd = Net::Inetd->new;
 
 $, = "\n";
-print @{$Inetd->dump_enabled},"\n";
-print @{$Inetd->dump_disabled},"\n";
+print @{$Inetd->dump_enabled}; print "\n\n";
+print @{$Inetd->dump_disabled}; print "\n";

@@ -1,14 +1,14 @@
 package Net::Inetd;
 
-$VERSION = '0.1';
+$VERSION = '0.11';
 
 use strict;
 use Net::Inetd::Entity;
 
 sub new {
-    my($pkg, $conf) = @_;
-    my $class = ref $pkg || $pkg;    
-    return bless Net::Inetd::Entity::_data($conf), $class; 
+    my($self, $conf) = @_;  
+    my $class = ref $self || $self;
+    return bless Net::Inetd::Entity::_new($conf), $class;
 }
 
 sub is_enabled    { &Net::Inetd::Entity::_is_enabled }
@@ -16,6 +16,8 @@ sub enable        { &Net::Inetd::Entity::_set }
 sub disable       { &Net::Inetd::Entity::_set }
 sub dump_enabled  { &Net::Inetd::Entity::_dump }
 sub dump_disabled { &Net::Inetd::Entity::_dump }
+
+sub DESTROY { &Net::Inetd::Entity::_destroy }
 
 1;
 __END__
@@ -37,7 +39,7 @@ Net::Inetd - An interface to inetd.conf
  print $Inetd->{CONF}[6];                                               
 
  $, = "\n";
- print @{$Inetd->dump_enabled},"\n";            
+ print @{$Inetd->dump_enabled};            
 
 =head1 DESCRIPTION
 

@@ -1,5 +1,8 @@
 Revision history for Perl extension Net::Inetd.
 
+0.11 2004/01/28
+ - deadlock in flock() abandoned.
+
 0.09 2004/01/27
  - some inefficiency cleaned up.
 

@@ -1,8 +1,8 @@
 package Net::Inetd::Entity;
 
 use strict;
-use vars qw($INETD_CONF);
-use Fcntl 'O_RDWR';
+use vars qw($INETD_CONF $tied);
+use Fcntl qw(O_RDWR LOCK_EX LOCK_UN);
 use Tie::File;
 
 $INETD_CONF = '/etc/inetd.conf';
@@ -12,7 +12,7 @@ sub croak {
     die "@_ at $called line $line_nr.\n";
 }
 
-sub _data {
+sub _new {
     my $conf_file = shift || $INETD_CONF;      
     my %data;    
     _tie_conf(\@{$data{CONF}}, $conf_file);    
@@ -22,9 +22,9 @@ sub _data {
 
 sub _tie_conf {
     my($conf, $file) = @_;
-    my $tied = tie @$conf, 'Tie::File', $file, mode => O_RDWR
+    $tied = tie @$conf, 'Tie::File', $file, mode => O_RDWR
       or croak "Couldn't tie $file: $!";
-    $tied->flock;
+    $tied->flock(LOCK_EX);
 }   
 
 sub _parse_enabled {
@@ -35,7 +35,7 @@ sub _parse_enabled {
 	$is_enabled{$serv}{$prot} = !/^\#/ ? 1 : 0;
     }    
     return \%is_enabled;
-} 
+}
 
 sub _is_enabled {
     my($o, $serv, $prot) = @_;
@@ -103,5 +103,11 @@ sub _getcaller {
     my ($called) = (caller(2))[3] =~ /.*:$pattern/;
     return $called;
 }
+
+sub _destroy { 
+    my $o = shift;
+    $tied->flock(LOCK_UN);
+    untie @{$o->{CONF}};
+} 
 
 1;
