@@ -5,7 +5,7 @@ use warnings;
 
 use Net::Inetd;
 
-my $Inetd = Net::Inetd->new;
+my $Inetd = Net::Inetd->new('./inetd.conf');
 
 $, = "\n";
 print @{$Inetd->dump_enabled},"\n";

@@ -1,11 +1,10 @@
 package Net::Inetd;
 
 use 5.006;
-use base qw(Exporter);
 use strict;
 use warnings;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 use Carp 'croak';
 use Fcntl 'O_RDWR';
@@ -29,63 +28,10 @@ sub is_enabled {
       : undef;
 }
 
-sub enable  {  
-    my($o, $serv, $prot) = @_;
-    croak 'usage: $Inetd->enable($service => $protocol)'
-      unless $serv && $prot;
-      
-    for (@{$o->{CONF}}) {
-        if (/$serv.*$prot\b/ && /^\#/) {
-	    $_ = substr $_, 1, length;
-	    $o->{ENABLED}{$serv}{$prot} = 1;
-	    return 1;
-        }
-    }
-    return 0;    
-}
-
-sub disable {
-    my($o, $serv, $prot) = @_;
-    croak 'usage: $Inetd->disable($service => $protocol)'
-      unless $serv && $prot;
-      
-    for (@{$o->{CONF}}) {
-        if (/$serv.*$prot\b/ && !/^\#/) {
-	    $_ = '#'.$_;
-	    $o->{ENABLED}{$serv}{$prot} = 0;
-            return 1;
-	}  
-    }
-    return 0;  
-}
-
-sub dump_enabled  {
-    my $o = shift;
-    croak 'usage: $Inetd->dump_enabled'
-      unless ref $o;
-       
-    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);
-    for (my $i = 0; $i < @conf;) { 
-        $conf[$i] =~ /^\#/
-	  ? splice @conf, $i, 1 
-	  : $i++;
-    }  
-    return \@conf;   
-}
-
-sub dump_disabled {
-    my $o = shift;
-    croak 'usage: $Inetd->dump_disabled'
-      unless ref $o;
-       
-    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);
-    for (my $i = 0; $i < @conf;) { 
-        $conf[$i] !~ /^\#/
-	  ? splice @conf, $i, 1 
-	  : $i++;
-    }  
-    return \@conf;     
-}
+sub enable        { &_set  }
+sub disable       { &_set  }
+sub dump_enabled  { &_dump }
+sub dump_disabled { &_dump }
 
 sub _data {
     my $conf_file = shift || $INETD_CONF;      
@@ -112,13 +58,48 @@ sub _parse_enabled {
     return \%is_enabled;
 } 
 
-sub _filter_conf {
-    my $conf = shift;    
-    for (my $i = 0; $i < @$conf;) { 
-        $$conf[$i] !~ /(?:stream|dgram|raw|rdm|seqpacket)/
-	  ? splice @$conf, $i, 1 
-	  : $i++;
+sub _set {
+    my($o, $serv, $prot) = @_;
+    my $called = _getcaller();
+    croak "usage: \$Inetd->$called(\$service => \$protocol)"
+      unless $serv && $prot;
+    
+    my($prechar, $enable) = $called eq 'enable'
+      ? ('#', 1) : ('', 0);
+    for (@{$o->{CONF}}) {
+        if (/^$prechar$serv.*$prot\b/) {
+	    ($_, $o->{ENABLED}{$serv}{$prot}) = $enable
+	      ? (substr($_, 1, length), 1)
+	      : ('#'.$_, 0);
+	    return 1;
+	}
     }
+    return 0;
+}
+
+sub _dump {
+    my $o = shift;
+    my $called = _getcaller('.*_(.*)');
+    croak "usage: \$Inetd->dump_$called"
+      unless ref $o;
+       
+    my @conf = @{$o->{CONF}};
+    _filter_conf(\@conf, $called eq 'enabled' 
+      ? '^[^#]' : '^#');
+    return \@conf;     
+}
+
+sub _filter_conf {
+    my $conf = shift;
+    my $match;   
+    my @patterns = ('(?:stream|dgram|raw|rdm|seqpacket)', @_);     
+    for (my $i = 0; $i < @$conf;) {
+        for (@patterns) { 
+            $match = $$conf[$i] =~ /$_/;
+	    last unless $match;
+	}
+	$match ? $i++ : splice @$conf, $i, 1;
+    } 
 }
 
 sub _split_serv_prot {
@@ -129,6 +110,12 @@ sub _split_serv_prot {
     $serv = substr $serv, 1, length $serv 
       if $serv =~ /^\#/; 
     return($serv, $prot);
+}
+
+sub _getcaller {
+    my $pattern = shift || '(?:.*)';
+    my ($called) = (caller(2))[3] =~ /.*:$pattern/;
+    return $called;
 }
 
 1;
@@ -142,24 +129,16 @@ Net::Inetd - an interface to inetd.conf.
 
  use Net::Inetd;
 
- $Inetd = Net::Inetd->new;                      # constructor
+ $Inetd = Net::Inetd->new;                      
 
- if ($Inetd->is_enabled(telnet => 'tcp')) {     # disable telnet
+ if ($Inetd->is_enabled(telnet => 'tcp')) {    
      $Inetd->disable(telnet => 'tcp');
  }
 
- if (!$Inetd->is_enabled(ftp => 'tcp')) {       # enable ftp
-     $Inetd->enable(ftp => 'tcp');
- }
-
- print $Inetd->{CONF}[6];                       # output a line
-
- push @{$Inetd->{CONF}}, $service;              # add a new line
-
- pop @{$Inetd->{CONF}};                         # NOT recommended
+ print $Inetd->{CONF}[6];                                               
 
  $, = "\n";
- print @{$Inetd->dump_enabled},"\n";            # output enabled services
+ print @{$Inetd->dump_enabled},"\n";            
 
 =head1 DESCRIPTION
 
@@ -232,6 +211,6 @@ It may be accessed by @{$Inetd->{CONF}}.
 
 =head1 SEE ALSO
 
-L<Tie::File>, L<perlfunc/tie>.
+L<Tie::File>, inetd(8).
 
 =cut
