@@ -5,10 +5,10 @@ use base qw(Exporter);
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Carp 'croak';
-use Fcntl qw(LOCK_EX O_RDWR);
+use Fcntl 'O_RDWR';
 use Tie::File;
 
 our $INETD_CONF = '/etc/inetd.conf';
@@ -64,10 +64,13 @@ sub dump_enabled  {
     croak 'usage: $Inetd->dump_enabled'
       unless ref $o;
        
-    my @dump;
-    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);  
-    for (@conf) { push @dump, $_ if !/^\#/ }   
-    return \@dump;    
+    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);
+    for (my $i = 0; $i < @conf;) { 
+        $conf[$i] =~ /^\#/
+	  ? splice @conf, $i, 1 
+	  : $i++;
+    }  
+    return \@conf;   
 }
 
 sub dump_disabled {
@@ -75,10 +78,13 @@ sub dump_disabled {
     croak 'usage: $Inetd->dump_disabled'
       unless ref $o;
        
-    my @dump;
-    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);  
-    for (@conf) { push @dump, $_ if /^\#/ }   
-    return \@dump;   
+    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);
+    for (my $i = 0; $i < @conf;) { 
+        $conf[$i] !~ /^\#/
+	  ? splice @conf, $i, 1 
+	  : $i++;
+    }  
+    return \@conf;     
 }
 
 sub _data {
@@ -93,7 +99,7 @@ sub _tie_conf {
     my($conf, $file) = @_;
     my $tied = tie @$conf, 'Tie::File', $file, mode => O_RDWR
       or croak "Couldn't tie $file: $!";
-    $tied->flock(LOCK_EX);
+    $tied->flock;
 }   
 
 sub _parse_enabled {
@@ -108,17 +114,16 @@ sub _parse_enabled {
 
 sub _filter_conf {
     my $conf = shift;    
-    my @tmp;
-    for (@$conf) {
-        push @tmp, $_
-	  if /(?:stream|dgram|raw|rdm|seqpacket)/;
+    for (my $i = 0; $i < @$conf;) { 
+        $$conf[$i] !~ /(?:stream|dgram|raw|rdm|seqpacket)/
+	  ? splice @$conf, $i, 1 
+	  : $i++;
     }
-    @$conf = @tmp;
 }
 
 sub _split_serv_prot {
     my($line) = shift; 
-    my($serv, $prot) = (split /\s+/, $line)[0,2];
+    my($serv, $prot) = (split, $line)[0,2];
     ($serv) = $serv =~ /.*:(.*)/ 
       if $serv =~ /:/;
     $serv = substr $serv, 1, length $serv 
@@ -158,7 +163,7 @@ Net::Inetd - an interface to inetd.conf.
 
 =head1 DESCRIPTION
 
-C<Net::Inetd> is an interface to inetd's configuration file inetd.conf;
+Net::Inetd is an interface to inetd's configuration file F<inetd.conf>;
 it simplifies checking and setting the enabled / disabled state of services 
 and dumping them by their state.
 
@@ -220,7 +225,8 @@ lines which contain disabled services.
 
 =head1 INSTANCE DATA
 
-The inetd.conf configuration is tied as instance data using C<Tie::File>.
+The inetd.conf configuration is tied as instance data
+by using Tie::File.
 
 It may be accessed by @{$Inetd->{CONF}}.
 
