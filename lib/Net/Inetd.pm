@@ -1,4 +1,4 @@
-# $Id: Inetd.pm,v 0.02 2004/01/20 12:14:09 sts Exp $
+# $Id: Inetd.pm,v 0.03 2004/01/20 12:14:09 sts Exp $
 
 package Net::Inetd;
 
@@ -7,7 +7,7 @@ use base qw(Exporter);
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Tie::File;
 
@@ -174,16 +174,15 @@ Net::Inetd - an interface to inetd.conf.
  push @{$Inetd->{CONF}}, $service;              # add a new line
 
  pop @{$Inetd->{CONF}};                         # NOT recommended.
-
- foreach (@{$Inetd->dump_enabled}) {            # output enabled services
-     print "$_\n";
- }
+ 
+ $, = "\n";
+ print @{$Inetd->dump_enabled},"\n";            # output enabled services
 
 =head1 DESCRIPTION
 
 C<Net::Inetd> is an interface to inetd's configuration file inetd.conf;
-it allows checking and setting the enabled/disabled state of a service.
-The configuration is tied as class data using C<Tie::File>.
+it allows checking and setting the enabled / disabled state of a service 
+and dumping services sorted by their state.
 
 =head1 CONSTRUCTOR
 
@@ -243,8 +242,9 @@ lines which contain disabled services.
 
 =head1 CLASS DATA
 
-The inetd.conf will be tied to the object as array and may be
-accessed by @{$Inetd->{CONF}}; $Inetd->{CONF}[6] for the 7th line.
+The inetd.conf configuration is tied as class data using C<Tie::File>.
+
+It may be accessed by @{$Inetd->{CONF}}.
 
 =head1 SEE ALSO
 

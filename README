@@ -11,6 +11,12 @@ To install this module type the following:
    make
    make test
    make install
+   
+SCRIPTS
+
+bin/inetd.pl
+
+Interface to Net::Inetd that outputs services.
 
 LICENSE
 

@@ -1,5 +1,8 @@
 Revision history for Perl extension Net::Inetd.
 
+0.03 2004/01/21
+ - bin/inetd.pl added.
+
 0.02 2004/01/20
  - methods for dumping enabled/disabled services.
 
