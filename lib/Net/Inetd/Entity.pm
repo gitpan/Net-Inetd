@@ -5,7 +5,9 @@ use vars qw($INETD_CONF $conf_tied);
 use Fcntl qw(O_RDWR LOCK_EX LOCK_UN);
 use Tie::File;
 
+
 $INETD_CONF = '/etc/inetd.conf';
+
 
 sub croak {
     my($called, $line_nr) = (caller(2))[1,2];
@@ -36,8 +38,8 @@ sub _parse_enabled {
     my %is_enabled;
     for my $entry (@_) {
 	my($serv, $prot) = _split_serv_prot($entry);
-	$is_enabled{$serv}{$prot} = !/^\#/ ? 1 : 0;
-    }    
+	$is_enabled{$serv}{$prot} = !/^#/ ? 1 : 0;
+    }  
     return \%is_enabled;
 }
 
@@ -51,24 +53,36 @@ sub _is_enabled {
       : undef;
 }
 
-sub _set {
+sub _enable {
     my($o, $serv, $prot) = @_;
-    my $called = _getcaller();
-    croak "usage: \$Inetd->$called(\$service => \$protocol)"
+    croak 'usage: $Inetd->_enable($service => $protocol)'
       unless $serv && $prot;
     
-    my $enable = 1 if $called eq 'enable';
-    my $prechar = $enable ? '#' : '';
-    
-    local $_;
-    for (@{$o->{CONF}}) {
-        if (/^$prechar $serv.*$prot\b/ox) {
-	    $o->{ENABLED}{$serv}{$prot} = $enable ? 1 : 0;
-	    $_ = $enable ? substr($_, 1, length) : '#'.$_;
+    for my $entry (@{$o->{CONF}}) {
+        if ($entry =~ /^\# .* $serv.*$prot\b/ox) {
+	    $o->{ENABLED}{$serv}{$prot} = 1;
+	    $entry = substr($entry, 1, length($entry)); 
+	    
 	    return 1;
 	}
     }
-    return 0;
+    return 0; 
+}
+
+sub _disable {
+    my($o, $serv, $prot) = @_;
+    croak 'usage: $Inetd->_disable($service => $protocol)'
+      unless $serv && $prot;
+    
+    for my $entry (@{$o->{CONF}}) {
+        if ($entry =~ /^(?!\#) .* $serv.*$prot\b/ox) {
+	    $o->{ENABLED}{$serv}{$prot} = 0;
+	    $entry = '#'.$entry; 
+	    
+	    return 1;
+	}
+    }
+    return 0; 
 }
 
 sub _dump {
@@ -88,6 +102,7 @@ sub _filter_conf {
     my($conf, @regexps) = @_;
      
     unshift @regexps, '(?:stream|dgram|raw|rdm|seqpacket)';
+    
     for (my $i = $#$conf; $i >= 0; $i--) {
         for my $regexp (@regexps) {
 	    splice(@$conf, $i, 1) && last
@@ -100,9 +115,10 @@ sub _split_serv_prot {
     my($entry) = @_;
      
     my($serv, $prot) = (split $entry)[0,2];
+    
     $serv =~ s/.*:(.*)/$1/; 
     $serv = substr($serv, 1, length $serv) 
-      if $serv =~ /^\#/;  
+      if $serv =~ /^#/;  
           
     return($serv, $prot);
 }
