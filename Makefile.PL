@@ -1,5 +1,4 @@
 use ExtUtils::MakeMaker;
-
 WriteMakefile(
     DISTNAME     => 'Net-Inetd',
     NAME         => 'Net::Inetd',

@@ -1,5 +1,3 @@
-# $Id: Inetd.pm,v 0.05 2004/01/22 15:05:46 sts Exp $
-
 package Net::Inetd;
 
 use 5.006;
@@ -7,29 +5,22 @@ use base qw(Exporter);
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
+use Carp 'croak';
 use Tie::File;
 
-our ($enable, $INETD_CONF);
-
-$INETD_CONF = '/etc/inetd.conf';
-
-sub croak { 
-    require Carp;
-    &Carp::croak;
-}
+our $INETD_CONF = '/etc/inetd.conf';
 
 sub new {
-    my ($pkg, $conf) = @_;
-    
+    my($pkg, $conf) = @_;    
     my $class = ref $pkg || $pkg;
-    return bless _class_data($conf), $class; 
+    return bless _data($conf), $class; 
 }
 
 sub is_enabled {
-    my ($o, $serv, $prot) = @_;
-    croak q~Usage: $Inetd->is_enabled($service => $protocol)~
+    my($o, $serv, $prot) = @_;
+    croak 'usage: $Inetd->is_enabled($service => $protocol)'
       unless $serv && $prot;
     
     return defined $o->{ENABLED}{$serv}{$prot}
@@ -37,89 +28,77 @@ sub is_enabled {
       : undef;
 }
 
-sub enable { local $enable = 1; &_set }
+sub enable  { &_set }
 sub disable { &_set }
 
-sub dump_enabled { local $enable = 1; &_dump }
+sub dump_enabled  { &_dump }
 sub dump_disabled { &_dump }
 
-sub _class_data {
-    my $conf_file = $_[0];
-    
-    $conf_file ||= $INETD_CONF;
-    
+sub _data {
+    my $conf_file = shift || $INETD_CONF;      
     my %data;    
-    _tie_conf(\@{$data{CONF}}, \$conf_file);    
-    %{$data{ENABLED}} = %{_parse_enabled(@{$data{CONF}})};
-    
+    _tie_conf(\@{$data{CONF}}, $conf_file);    
+    %{$data{ENABLED}} = %{_parse_enabled(@{$data{CONF}})};    
     return \%data;
 } 
 
 sub _tie_conf {
-    my ($conf, $file) = @_;
-    
-    tie @$conf, 'Tie::File', $$file
-      or croak qq~Couldn't tie $$file: $!~;
+    my($conf, $file) = @_;
+    croak "$file: $!" unless -e $file;
+    tie @$conf, 'Tie::File', $file
+      or croak "Couldn't tie $file: $!";
 }   
 
 sub _parse_enabled {
-    my (%is_enabled, @serv);     
+    my(%is_enabled, @serv);         
     _filter_conf(\@_);
     for (@_) {
-	_split_serv(\@serv, \$_);	
-	my ($serv, $prot) = (shift @serv, splice @serv, 1, 1);
-	
+	my($serv, $prot) = _split_serv_prot($_);
 	$is_enabled{$serv}{$prot} = !/^\#/ ? 1 : 0;
-    }
-    
+    }    
     return \%is_enabled;
 } 
 
 sub _set {
-    my ($o, $serv, $prot) = @_;
-    my $sub = $enable ? 'enable' : 'disable';
-    croak qq~Usage: \$Inetd->$sub(\$service => \$protocol)~
+    my($o, $serv, $prot) = @_;
+    my $called = _getcaller();
+    croak "usage: \$Inetd->$called(\$service => \$protocol)"
       unless $serv && $prot;
-    
+          
     my $ret_state = 0;
-    for (my $i = 0; $i < @{$o->{CONF}}; $i++) {
-        if ($o->{CONF}[$i] =~ /$serv.*$prot\b/) {
-	    if ($enable) {
-	        if ($o->{CONF}[$i] =~ /^\#/) {
-	            $o->{CONF}[$i] = substr $o->{CONF}[$i], 
-		      1, length $o->{CONF}[$i];
+    for (@{$o->{CONF}}) {
+        if (/$serv.*$prot\b/) {
+	    if ($called eq 'enable') {
+	        if (/^\#/) {
+	            $_ = substr $_, 1, length;
 		    $o->{ENABLED}{$serv}{$prot} = 1;
 		    $ret_state = 1;
 		}
             } 
-	    elsif ($o->{CONF}[$i] !~ /^\#/) {
-	        $o->{CONF}[$i] = '#'.$o->{CONF}[$i];
+	    elsif (!/^\#/) {
+	        $_ = '#'.$_;
 		$o->{ENABLED}{$serv}{$prot} = 0;
 		$ret_state = 1;
 	    }      
 	}    
-    } 
-     
+    }     
     return $ret_state;
 } 
 
 sub _dump {
-    my $o = $_[0];
-    
-    my @dump;
+    my $o = shift; 
+    my $called = _getcaller('.*_(.*)'); my @dump;
     my @conf = @{$o->{CONF}}; _filter_conf(\@conf);  
     for (@conf) {
-        next if (($enable && $_ =~ /^\#/) 
-	  || (!$enable && $_ !~ /^\#/));
+        next if (($called eq 'enabled' && $_ =~ /^\#/) 
+	  || ($called eq 'disabled' && $_ !~ /^\#/));
 	push @dump, $_;    
-    }
-    
+    }   
     return \@dump;   
 }
 
 sub _filter_conf {
-    my $conf = $_[0];
-    
+    my $conf = shift;    
     my @tmp;
     for (@$conf) {
         push @tmp, $_
@@ -128,17 +107,22 @@ sub _filter_conf {
     @$conf = @tmp;
 }
 
-sub _split_serv {
-    my ($serv, $line) = @_;
-    
-    @$serv = split /\s.*?/, $$line;
-    splice @$serv, 1, 1 if $$serv[1] !~ /\w/;
-    
-    ($$serv[0]) = $$serv[0] =~ /.*:(?:.*)/ 
-      if $$serv[0] =~ /:/;
-    $$serv[0] = substr $$serv[0], 1, length $$serv[0] 
-      if $$serv[0]=~ /^\#/; 
+sub _split_serv_prot {
+    my($line) = shift; 
+    my($serv, $prot) = (split /\s+/, $line)[0,2];
+    ($serv) = $serv =~ /.*:(.*)/ 
+      if $serv =~ /:/;
+    $serv = substr $serv, 1, length $serv 
+      if $serv =~ /^\#/; 
+    return($serv, $prot);
 }
+
+sub _getcaller {
+    my $regex = shift;
+    my $sub = (caller(2))[3]; ($sub) = $sub =~ /.*:(.*)/;
+    ($sub) = $sub =~ qr/$regex/ if $regex;
+    return $sub;
+} 
 
 1;
 __END__
@@ -165,7 +149,7 @@ Net::Inetd - an interface to inetd.conf.
 
  push @{$Inetd->{CONF}}, $service;              # add a new line
 
- pop @{$Inetd->{CONF}};                         # NOT recommended.
+ pop @{$Inetd->{CONF}};                         # NOT recommended
 
  $, = "\n";
  print @{$Inetd->dump_enabled},"\n";            # output enabled services
