@@ -5,9 +5,10 @@ use base qw(Exporter);
 use strict;
 use warnings;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use Carp 'croak';
+use Fcntl qw(LOCK_EX O_RDWR);
 use Tie::File;
 
 our $INETD_CONF = '/etc/inetd.conf';
@@ -28,11 +29,57 @@ sub is_enabled {
       : undef;
 }
 
-sub enable  { &_set }
-sub disable { &_set }
+sub enable  {  
+    my($o, $serv, $prot) = @_;
+    croak 'usage: $Inetd->enable($service => $protocol)'
+      unless $serv && $prot;
+      
+    for (@{$o->{CONF}}) {
+        if (/$serv.*$prot\b/ && /^\#/) {
+	    $_ = substr $_, 1, length;
+	    $o->{ENABLED}{$serv}{$prot} = 1;
+	    return 1;
+        }
+    }
+    return 0;    
+}
 
-sub dump_enabled  { &_dump }
-sub dump_disabled { &_dump }
+sub disable {
+    my($o, $serv, $prot) = @_;
+    croak 'usage: $Inetd->disable($service => $protocol)'
+      unless $serv && $prot;
+      
+    for (@{$o->{CONF}}) {
+        if (/$serv.*$prot\b/ && !/^\#/) {
+	    $_ = '#'.$_;
+	    $o->{ENABLED}{$serv}{$prot} = 0;
+            return 1;
+	}  
+    }
+    return 0;  
+}
+
+sub dump_enabled  {
+    my $o = shift;
+    croak 'usage: $Inetd->dump_enabled'
+      unless ref $o;
+       
+    my @dump;
+    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);  
+    for (@conf) { push @dump, $_ if !/^\#/ }   
+    return \@dump;    
+}
+
+sub dump_disabled {
+    my $o = shift;
+    croak 'usage: $Inetd->dump_disabled'
+      unless ref $o;
+       
+    my @dump;
+    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);  
+    for (@conf) { push @dump, $_ if /^\#/ }   
+    return \@dump;   
+}
 
 sub _data {
     my $conf_file = shift || $INETD_CONF;      
@@ -44,13 +91,13 @@ sub _data {
 
 sub _tie_conf {
     my($conf, $file) = @_;
-    croak "$file: $!" unless -e $file;
-    tie @$conf, 'Tie::File', $file
+    my $tied = tie @$conf, 'Tie::File', $file, mode => O_RDWR
       or croak "Couldn't tie $file: $!";
+    $tied->flock(LOCK_EX);
 }   
 
 sub _parse_enabled {
-    my(%is_enabled, @serv);         
+    my %is_enabled;         
     _filter_conf(\@_);
     for (@_) {
 	my($serv, $prot) = _split_serv_prot($_);
@@ -58,44 +105,6 @@ sub _parse_enabled {
     }    
     return \%is_enabled;
 } 
-
-sub _set {
-    my($o, $serv, $prot) = @_;
-    my $called = _getcaller();
-    croak "usage: \$Inetd->$called(\$service => \$protocol)"
-      unless $serv && $prot;
-          
-    my $ret_state = 0;
-    for (@{$o->{CONF}}) {
-        if (/$serv.*$prot\b/) {
-	    if ($called eq 'enable') {
-	        if (/^\#/) {
-	            $_ = substr $_, 1, length;
-		    $o->{ENABLED}{$serv}{$prot} = 1;
-		    $ret_state = 1;
-		}
-            } 
-	    elsif (!/^\#/) {
-	        $_ = '#'.$_;
-		$o->{ENABLED}{$serv}{$prot} = 0;
-		$ret_state = 1;
-	    }      
-	}    
-    }     
-    return $ret_state;
-} 
-
-sub _dump {
-    my $o = shift; 
-    my $called = _getcaller('.*_(.*)'); my @dump;
-    my @conf = @{$o->{CONF}}; _filter_conf(\@conf);  
-    for (@conf) {
-        next if (($called eq 'enabled' && $_ =~ /^\#/) 
-	  || ($called eq 'disabled' && $_ !~ /^\#/));
-	push @dump, $_;    
-    }   
-    return \@dump;   
-}
 
 sub _filter_conf {
     my $conf = shift;    
@@ -116,13 +125,6 @@ sub _split_serv_prot {
       if $serv =~ /^\#/; 
     return($serv, $prot);
 }
-
-sub _getcaller {
-    my $regex = shift;
-    my $sub = (caller(2))[3]; ($sub) = $sub =~ /.*:(.*)/;
-    ($sub) = $sub =~ qr/$regex/ if $regex;
-    return $sub;
-} 
 
 1;
 __END__
@@ -224,6 +226,6 @@ It may be accessed by @{$Inetd->{CONF}}.
 
 =head1 SEE ALSO
 
-L<Tie::File>.
+L<Tie::File>, L<perlfunc/tie>.
 
 =cut
